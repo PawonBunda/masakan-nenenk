@@ -47,10 +47,41 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         [v-cloak] { display: none !important; }
+        
+        /* Animasi Toast */
+        .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
+        .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(-20px); }
     </style>
 </head>
 <body class="text-slate-800 antialiased selection:bg-brand-500 selection:text-white h-full flex flex-col">
     <div id="app" v-cloak class="min-h-screen flex flex-col">
+
+        <!-- ================= CUSTOM TOAST NOTIFICATION ================= -->
+        <div class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full px-4 pointer-events-none">
+            <transition-group name="toast">
+                <div 
+                    v-for="toast in toasts" 
+                    :key="toast.id"
+                    class="pointer-events-auto flex items-center justify-between gap-3 p-4 rounded-2xl shadow-xl border backdrop-blur-md text-xs font-semibold transition-all"
+                    :class="{
+                        'bg-emerald-900/90 text-white border-emerald-700': toast.type === 'success',
+                        'bg-red-900/90 text-white border-red-700': toast.type === 'error',
+                        'bg-slate-900/90 text-white border-slate-700': toast.type === 'info'
+                    }">
+                    <div class="flex items-center gap-2.5">
+                        <i class="text-base" :class="{
+                            'fa-solid fa-circle-check text-emerald-400': toast.type === 'success',
+                            'fa-solid fa-circle-exclamation text-red-400': toast.type === 'error',
+                            'fa-solid fa-circle-info text-blue-400': toast.type === 'info'
+                        }"></i>
+                        <span>{{ toast.message }}</span>
+                    </div>
+                    <button @click="removeToast(toast.id)" class="text-white/60 hover:text-white">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </transition-group>
+        </div>
 
         <!-- HEADER / NAVIGATION -->
         <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -527,8 +558,13 @@
                                 </div>
                             </div>
 
-                            <button @click="saveJamPOToSheet" class="w-full mt-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-xl text-xs transition-all shadow-sm">
-                                Simpan Pengaturan Jam Order (Jam PO)
+                            <!-- TOMBOL SIMPAN JAM PO DENGAN ANIMASI LOADING & DISABLE -->
+                            <button 
+                                @click="saveJamPOToSheet" 
+                                :disabled="isSavingJamPO"
+                                class="w-full mt-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i v-if="isSavingJamPO" class="fa-solid fa-spinner animate-spin"></i>
+                                <span>{{ isSavingJamPO ? 'Menyimpan Jam PO...' : 'Simpan Pengaturan Jam Order (Jam PO)' }}</span>
                             </button>
                         </div>
                     </div>
@@ -575,8 +611,13 @@
                                     <textarea v-model="newProduct.deskripsi" rows="2" placeholder="Deskripsi singkat..." class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"></textarea>
                                 </div>
 
-                                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl transition-all shadow-md shadow-brand-500/20">
-                                    Simpan Menu Baru
+                                <!-- TOMBOL SIMPAN MENU BARU DENGAN ANIMASI LOADING & DISABLE -->
+                                <button 
+                                    type="submit" 
+                                    :disabled="isSavingMenu"
+                                    class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl transition-all shadow-md shadow-brand-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i v-if="isSavingMenu" class="fa-solid fa-spinner animate-spin"></i>
+                                    <span>{{ isSavingMenu ? 'Menyimpan Menu...' : 'Simpan Menu Baru' }}</span>
                                 </button>
                             </form>
 
@@ -586,22 +627,32 @@
                                     <i class="fa-solid fa-gear text-slate-600"></i> Pengaturan Sistem (Google Sheets)
                                 </h4>
 
+                                <!-- TOMBOL SIMPAN WA OWNER DENGAN ANIMASI LOADING & DISABLE -->
                                 <div>
                                     <label class="block font-semibold text-slate-600 mb-1 text-xs">Nomor WhatsApp Owner (Tujuan Order)</label>
                                     <div class="flex gap-2">
                                         <input v-model="ownerWhatsapp" type="text" placeholder="628123456789" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
-                                        <button @click="updateWhatsapp" :disabled="isLoading" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shadow-sm">
-                                            Simpan WA
+                                        <button 
+                                            @click="updateWhatsapp" 
+                                            :disabled="isSavingWA" 
+                                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i v-if="isSavingWA" class="fa-solid fa-spinner animate-spin"></i>
+                                            <span>{{ isSavingWA ? 'Menyimpan...' : 'Simpan WA' }}</span>
                                         </button>
                                     </div>
                                 </div>
 
+                                <!-- TOMBOL SIMPAN PIN DENGAN ANIMASI LOADING & DISABLE -->
                                 <div>
                                     <label class="block font-semibold text-slate-600 mb-1 text-xs">Ubah PIN Dashboard Owner</label>
                                     <div class="flex gap-2">
                                         <input v-model="newPinInput" type="password" maxlength="6" placeholder="PIN Baru" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
-                                        <button @click="changePin" :disabled="isLoading" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shadow-sm">
-                                            Simpan PIN
+                                        <button 
+                                            @click="changePin" 
+                                            :disabled="isSavingPIN" 
+                                            class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i v-if="isSavingPIN" class="fa-solid fa-spinner animate-spin"></i>
+                                            <span>{{ isSavingPIN ? 'Menyimpan...' : 'Simpan PIN' }}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -775,8 +826,9 @@
                         <button 
                             @click="submitCheckout" 
                             :disabled="isLoading"
-                            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
-                            <i class="fa-brands fa-whatsapp text-lg"></i>
+                            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i v-if="isLoading" class="fa-solid fa-spinner animate-spin"></i>
+                            <i v-else class="fa-brands fa-whatsapp text-lg"></i>
                             <span>{{ isLoading ? 'Memproses Pesanan...' : 'Pesan Sekarang (Buka WhatsApp)' }}</span>
                         </button>
                     </div>
@@ -816,6 +868,15 @@
                     ownerWhatsapp: '6281234567890',
                     apiUrl: 'https://script.google.com/macros/s/AKfycbyON6DpI7Ip71_NOc6w8SxL4ZPr4FlziqLxHW4UJ4FFhFGnTMEFdBt-_2jStoHkOWge/exec',
                     isLoading: false,
+
+                    // State Loading Tombol Khusus Pencegahan Dobel Input
+                    isSavingJamPO: false,
+                    isSavingMenu: false,
+                    isSavingWA: false,
+                    isSavingPIN: false,
+
+                    // Sistem Notifikasi Toast Kustom
+                    toasts: [],
 
                     checkoutForm: {
                         name: '',
@@ -996,6 +1057,19 @@
             },
 
             methods: {
+                // Fungsi Menampilkan Notifikasi Kustom (Toast)
+                showToast(message, type = 'success') {
+                    const id = Date.now();
+                    this.toasts.push({ id, message, type });
+                    setTimeout(() => {
+                        this.removeToast(id);
+                    }, 4000);
+                },
+
+                removeToast(id) {
+                    this.toasts = this.toasts.filter(t => t.id !== id);
+                },
+
                 formatRupiah(num) {
                     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num || 0);
                 },
@@ -1080,8 +1154,9 @@
                         this.isOwnerAuthenticated = true;
                         this.isPinModalOpen = false;
                         this.currentView = 'owner';
+                        this.showToast('Berhasil masuk ke Dashboard Admin!', 'success');
                     } else {
-                        alert('PIN Salah! Mohon periksa kembali PIN Anda.');
+                        this.showToast('PIN Salah! Mohon periksa kembali PIN Anda.', 'error');
                         this.pinInput = '';
                     }
                 },
@@ -1089,28 +1164,32 @@
                 lockOwnerView() {
                     this.isOwnerAuthenticated = false;
                     this.currentView = 'customer';
+                    this.showToast('Admin berhasil dikunci.', 'info');
                 },
 
                 async changePin() {
                     if (!this.newPinInput || this.newPinInput.length < 4) {
-                        alert('PIN minimal harus 4 digit!');
+                        this.showToast('PIN minimal harus 4 digit!', 'error');
                         return;
                     }
+                    this.isSavingPIN = true;
                     this.ownerPin = this.newPinInput;
                     this.newPinInput = '';
-                    await this.saveSettingsToSheet('PIN Owner berhasil diperbarui di Google Sheets!');
+                    await this.saveSettingsToSheet('PIN Owner berhasil diperbarui!');
+                    this.isSavingPIN = false;
                 },
 
                 async updateWhatsapp() {
                     if (!this.ownerWhatsapp) {
-                        alert('Nomor WhatsApp tidak boleh kosong!');
+                        this.showToast('Nomor WhatsApp tidak boleh kosong!', 'error');
                         return;
                     }
-                    await this.saveSettingsToSheet('Nomor WA Owner berhasil diperbarui di Google Sheets!');
+                    this.isSavingWA = true;
+                    await this.saveSettingsToSheet('Nomor WA Owner berhasil diperbarui!');
+                    this.isSavingWA = false;
                 },
 
-                async saveSettingsToSheet(successMsg = 'Pengaturan berhasil disimpan ke Google Sheets!') {
-                    this.isLoading = true;
+                async saveSettingsToSheet(successMsg = 'Pengaturan berhasil disimpan!') {
                     try {
                         await fetch(this.apiUrl, {
                             method: 'POST',
@@ -1124,17 +1203,15 @@
                                 }
                             })
                         });
-                        alert(successMsg);
+                        this.showToast(successMsg, 'success');
                     } catch (e) {
                         console.error('Gagal simpan pengaturan:', e);
-                        alert('Gagal menyimpan pengaturan ke Google Sheets.');
-                    } finally {
-                        this.isLoading = false;
+                        this.showToast('Gagal menyimpan pengaturan ke Google Sheets.', 'error');
                     }
                 },
 
                 async saveJamPOToSheet() {
-                    this.isLoading = true;
+                    this.isSavingJamPO = true;
                     try {
                         await fetch(this.apiUrl, {
                             method: 'POST',
@@ -1145,41 +1222,47 @@
                                 jam_po: this.operatingHours
                             })
                         });
-                        alert('Pengaturan jam operasional (Jam PO) berhasil disimpan ke Google Sheets!');
+                        this.showToast('Pengaturan Jam PO berhasil disimpan!', 'success');
                     } catch (e) {
                         console.error('Gagal simpan Jam PO:', e);
-                        alert('Gagal menyimpan Jam PO ke Google Sheets.');
+                        this.showToast('Gagal menyimpan Jam PO ke Google Sheets.', 'error');
                     } finally {
-                        this.isLoading = false;
+                        this.isSavingJamPO = false;
                     }
                 },
 
                 addToCart(product) {
                     if (product.stok <= 0 || !product.is_available) {
-                        alert('Maaf, stok menu ini sudah habis!');
+                        this.showToast('Maaf, stok menu ini sudah habis!', 'error');
                         return;
                     }
                     const existing = this.cart.find(item => item.id === product.id);
+                    const productName = product.nama || product.name; // Mengambil nama menu
+
                     if (existing) {
                         if (existing.jumlah >= product.stok) {
-                            alert('Jumlah di keranjang sudah mencapai batas stok yang tersedia!');
+                            this.showToast('Jumlah di keranjang sudah mencapai batas stok!', 'error');
                             return;
                         }
                         existing.jumlah++;
                     } else {
                         this.cart.push({
                             id: product.id,
-                            nama: product.nama || product.name,
+                            nama: productName,
                             harga: Number(product.harga || product.price),
                             gambar: product.gambar || product.image,
                             kategori: product.kategori || product.category,
                             jumlah: 1
                         });
                     }
+                    
+                    // Notifikasi toast kini menyertakan nama menu secara dinamis
+                    this.showToast(`"${productName}" berhasil ditambahkan ke keranjang.`, 'success');
                 },
 
                 removeFromCart(index) {
                     this.cart.splice(index, 1);
+                    this.showToast('Item dihapus dari keranjang.', 'info');
                 },
 
                 updateCartQty(index, change) {
@@ -1189,7 +1272,7 @@
                         const newQty = item.jumlah + change;
                         if (newQty > 0) {
                             if (product && newQty > product.stok) {
-                                alert('Stok tidak mencukupi!');
+                                this.showToast('Stok tidak mencukupi!', 'error');
                                 return;
                             }
                             item.jumlah = newQty;
@@ -1201,20 +1284,19 @@
 
                 async submitCheckout() {
                     if (!this.checkoutForm.name || !this.checkoutForm.poDate) {
-                        alert('Mohon isi Nama Lengkap dan Tanggal PO!');
+                        this.showToast('Mohon isi Nama Lengkap dan Tanggal PO!', 'error');
                         return;
                     }
                     
                     if (this.isOrderTimeClosed(this.checkoutForm.poDate)) {
-                        alert('Maaf, batas waktu pemesanan (cut-off time) untuk tanggal PO tersebut sudah tutup atau sudah lewat jam operasional!');
+                        this.showToast('Maaf, batas waktu pemesanan (cut-off time) untuk tanggal PO tersebut sudah tutup!', 'error');
                         return;
                     }
 
-                    // Validasi stok ulang sebelum checkout
                     for (const cartItem of this.cart) {
                         const prod = this.products.find(p => p.id === cartItem.id);
                         if (!prod || prod.stok < cartItem.jumlah || !prod.is_available) {
-                            alert(`Maaf, stok untuk menu "${cartItem.nama}" tidak mencukupi atau sudah habis!`);
+                            this.showToast(`Maaf, stok untuk menu "${cartItem.nama}" tidak mencukupi!`, 'error');
                             return;
                         }
                     }
@@ -1223,7 +1305,6 @@
                     const orderId = 'PO-' + Math.floor(100000 + Math.random() * 900000);
                     const cartItemsCopy = JSON.parse(JSON.stringify(this.cart));
 
-                    // Kurangi stok menu secara otomatis
                     cartItemsCopy.forEach(cartItem => {
                         const prod = this.products.find(p => p.id === cartItem.id);
                         if (prod) {
@@ -1284,6 +1365,7 @@
                     this.isCartOpen = false;
                     this.isLoading = false;
 
+                    this.showToast('Pesanan berhasil dibuat!', 'success');
                     window.open(`https://wa.me/${targetWa}?text=${encodeURIComponent(msg)}`, '_blank');
                 },
 
@@ -1291,6 +1373,7 @@
                     const order = this.orders.find(o => o.id === orderId);
                     if (order) {
                         order.status = newStatus;
+                        this.showToast(`Status pesanan diperbarui menjadi: ${newStatus}`, 'success');
 
                         try {
                             fetch(this.apiUrl, {
@@ -1312,6 +1395,7 @@
                 async deleteOrder(orderId) {
                     if (confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) {
                         this.orders = this.orders.filter(o => o.id !== orderId);
+                        this.showToast('Pesanan berhasil dihapus.', 'info');
 
                         try {
                             fetch(this.apiUrl, {
@@ -1367,6 +1451,7 @@
                 async addNewProduct() {
                     if (!this.newProduct.nama || !this.newProduct.harga) return;
 
+                    this.isSavingMenu = true;
                     let finalImageUrl = this.formatDriveUrlForSave(this.newProduct.gambar);
                     const initialStock = Number(this.newProduct.stok || 0);
 
@@ -1383,7 +1468,9 @@
 
                     this.products.push(productObj);
                     this.newProduct = { nama: '', harga: null, kategori: 'Makanan Utama', gambar: '', deskripsi: '', stok: 10, is_available: true };
-                    this.saveMenuToSheet();
+                    await this.saveMenuToSheet();
+                    this.isSavingMenu = false;
+                    this.showToast('Menu baru berhasil ditambahkan dan disimpan!', 'success');
                 },
 
                 updateProductStock(product) {
@@ -1400,18 +1487,20 @@
 
                 toggleProductAvailability(product) {
                     if (product.stok <= 0) {
-                        alert('Tidak dapat mengaktifkan menu karena stok masih 0!');
+                        this.showToast('Tidak dapat mengaktifkan menu karena stok masih 0!', 'error');
                         product.is_available = false;
                         return;
                     }
                     product.is_available = !product.is_available;
                     this.saveMenuToSheet();
+                    this.showToast('Status ketersediaan menu diperbarui.', 'info');
                 },
 
                 deleteProduct(id) {
                     if (confirm('Hapus menu ini?')) {
                         this.products = this.products.filter(p => p.id !== id);
                         this.saveMenuToSheet();
+                        this.showToast('Menu berhasil dihapus.', 'info');
                     }
                 },
 
@@ -1475,8 +1564,10 @@
                                 }));
                             }
                         }
+                        this.showToast('Data berhasil disinkronkan dengan Google Sheets.', 'success');
                     } catch (e) {
                         console.error('Gagal sync data:', e);
+                        this.showToast('Gagal melakukan sinkronisasi data.', 'error');
                     } finally {
                         this.isLoading = false;
                     }
