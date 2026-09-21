@@ -4,10 +4,22 @@
   "display": "standalone",
   "name": "pawonbunda.github",
   "orientation": "any",
-  "scope": "/",
+  "scope": "/masakan-nenenk/",
   "short_name": "pawonbunda.github",
-  "start_url": "/",
+  "start_url": "/masakan-nenenk/",
   "theme_color": "#fff000",
   "id": "Masakan Nenek",
   "description": "Maskan Rumah Khas Minang"
+  "icons": [
+        {
+            "src": "icone.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icone.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
 }
