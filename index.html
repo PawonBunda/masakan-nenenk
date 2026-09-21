@@ -57,7 +57,7 @@
     <div id="app" v-cloak class="min-h-screen flex flex-col">
 
         <!-- ================= CUSTOM TOAST NOTIFICATION ================= -->
-        <div class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full px-4 pointer-events-none">
+        <div class="fixed top-5 right-5 z-[99] flex flex-col gap-2 max-w-sm w-full px-4 pointer-events-none">
             <transition-group name="toast">
                 <div 
                     v-for="toast in toasts" 
@@ -362,6 +362,21 @@
 
                 <!-- TAB 1: DETAIL PESANAN -->
                 <div v-if="ownerTab === 'customers'" class="space-y-4">
+                    <!-- Tombol Hapus Berdasarkan Filter Aktif -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Aksi Massal Berdasarkan Filter</h4>
+                            <p class="text-slate-500 text-[11px]">Hapus semua pesanan yang saat ini muncul sesuai filter tanggal/status di atas.</p>
+                        </div>
+                        <button 
+                            @click="confirmDeleteFilteredOrders"
+                            :disabled="filteredOrders.length === 0"
+                            class="bg-red-600 hover:bg-red-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-trash-can"></i>
+                            <span>Hapus Semua Sesuai Filter ({{ filteredOrders.length }})</span>
+                        </button>
+                    </div>
+
                     <div v-if="filteredOrders.length === 0" class="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
                         <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto text-2xl">
                             <i class="fa-solid fa-inbox"></i>
@@ -452,7 +467,7 @@
                                     </button>
 
                                     <button 
-                                        @click="deleteOrder(order.id)" 
+                                        @click="confirmDeleteOrder(order.id)" 
                                         class="text-slate-400 hover:text-red-600 p-2 text-xs transition-colors"
                                         title="Hapus Pesanan">
                                         <i class="fa-solid fa-trash"></i>
@@ -463,18 +478,18 @@
                     </div>
                 </div>
 
-                <!-- TAB 2: REKAP PORSI DAPUR -->
+                <!-- TAB 2: REKAP PORSI DAPUR (Hanya menampilkan yang belum selesai / aktif) -->
                 <div v-if="ownerTab === 'kitchen'" class="space-y-4">
                     <div class="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3 text-amber-900 text-xs">
                         <i class="fa-solid fa-lightbulb text-amber-600 text-lg mt-0.5"></i>
                         <div>
                             <h5 class="font-bold">Informasi Rekap Dapur:</h5>
-                            <p>Total porsi yang harus dimasak berdasarkan pesanan aktif pada filter tanggal yang dipilih.</p>
+                            <p>Total porsi di bawah ini hanya menghitung pesanan yang berstatus <strong>Menunggu Konfirmasi</strong> dan <strong>Diproses / Dimasak</strong>. Pesanan yang sudah <em>Selesai</em> atau <em>Dibatalkan</em> otomatis disembunyikan.</p>
                         </div>
                     </div>
 
                     <div v-if="kitchenSummary.length === 0" class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 text-xs">
-                        Tidak ada porsi menu yang perlu disiapkan untuk filter saat ini.
+                        Tidak ada porsi menu aktif yang perlu dimasak untuk filter saat ini.
                     </div>
 
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -485,7 +500,7 @@
                             <div class="space-y-1">
                                 <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ summary.category }}</span>
                                 <h4 class="font-bold text-slate-900 text-base">{{ summary.name }}</h4>
-                                <p class="text-xs text-slate-500">Total Dipesan Pelanggan</p>
+                                <p class="text-xs text-slate-500">Porsi Belum Selesai Dibuat</p>
                             </div>
                             <div class="text-right">
                                 <span class="text-3xl font-black text-brand-600 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-2xl inline-block">
@@ -693,8 +708,9 @@
                                             {{ product.is_available && product.stok > 0 ? 'Tersedia' : 'Habis' }}
                                         </button>
                                         <button 
-                                            @click="deleteProduct(product.id)" 
-                                            class="p-2 text-slate-400 hover:text-red-600 transition-colors text-xs">
+                                            @click="confirmDeleteProduct(product.id, product.nama || product.name)" 
+                                            class="p-2 text-slate-400 hover:text-red-600 transition-colors text-xs"
+                                            title="Hapus Menu">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </div>
@@ -741,6 +757,35 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- ================= MODAL KONFIRMASI HAPUS (CUSTOM ALERT) ================= -->
+        <div v-if="deleteModal.isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 text-center space-y-5">
+                <div class="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-lg">{{ deleteModal.title }}</h3>
+                    <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">{{ deleteModal.message }}</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                    <button 
+                        type="button" 
+                        @click="deleteModal.isOpen = false" 
+                        class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all">
+                        Batal
+                    </button>
+                    <button 
+                        type="button" 
+                        @click="executeDeleteAction" 
+                        class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-red-500/25">
+                        Ya, Hapus
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -869,13 +914,19 @@
                     apiUrl: 'https://script.google.com/macros/s/AKfycbyON6DpI7Ip71_NOc6w8SxL4ZPr4FlziqLxHW4UJ4FFhFGnTMEFdBt-_2jStoHkOWge/exec',
                     isLoading: false,
 
-                    // State Loading Tombol Khusus Pencegahan Dobel Input
+                    deleteModal: {
+                        isOpen: false,
+                        title: '',
+                        message: '',
+                        type: '', 
+                        targetId: null
+                    },
+
                     isSavingJamPO: false,
                     isSavingMenu: false,
                     isSavingWA: false,
                     isSavingPIN: false,
 
-                    // Sistem Notifikasi Toast Kustom
                     toasts: [],
 
                     checkoutForm: {
@@ -1002,10 +1053,17 @@
                     });
                 },
 
+                // REKAP PORSI DAPUR (Hanya menampilkan pesanan yang BELUM SELESAI & BELUM BATAL)
                 kitchenSummary() {
                     const summaryMap = {};
                     this.filteredOrders.forEach(order => {
-                        if (order.status !== 'Dibatalkan' && order.status !== 'cancelled') {
+                        const status = (order.status || '').trim().toLowerCase();
+                        
+                        // Abaikan pesanan yang sudah Selesai atau Dibatalkan
+                        const isCompleted = status === 'selesai' || status === 'completed';
+                        const isCancelled = status === 'dibatalkan' || status === 'cancelled';
+
+                        if (!isCompleted && !isCancelled) {
                             const items = this.getItemList(order.items);
                             items.forEach(item => {
                                 const itemName = item.nama || item.name;
@@ -1057,7 +1115,6 @@
             },
 
             methods: {
-                // Fungsi Menampilkan Notifikasi Kustom (Toast)
                 showToast(message, type = 'success') {
                     const id = Date.now();
                     this.toasts.push({ id, message, type });
@@ -1237,7 +1294,7 @@
                         return;
                     }
                     const existing = this.cart.find(item => item.id === product.id);
-                    const productName = product.nama || product.name; // Mengambil nama menu
+                    const productName = product.nama || product.name;
 
                     if (existing) {
                         if (existing.jumlah >= product.stok) {
@@ -1255,8 +1312,6 @@
                             jumlah: 1
                         });
                     }
-                    
-                    // Notifikasi toast kini menyertakan nama menu secara dinamis
                     this.showToast(`"${productName}" berhasil ditambahkan ke keranjang.`, 'success');
                 },
 
@@ -1392,9 +1447,52 @@
                     }
                 },
 
-                async deleteOrder(orderId) {
-                    if (confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) {
-                        this.orders = this.orders.filter(o => o.id !== orderId);
+                confirmDeleteOrder(orderId) {
+                    this.deleteModal = {
+                        isOpen: true,
+                        title: 'Hapus Pesanan',
+                        message: `Apakah Anda yakin ingin menghapus pesanan dengan ID (${orderId}) ini?`,
+                        type: 'single',
+                        targetId: orderId
+                    };
+                },
+
+                confirmDeleteFilteredOrders() {
+                    const count = this.filteredOrders.length;
+                    if (count === 0) return;
+
+                    let filterDesc = 'Semua Tanggal';
+                    if (this.ownerFilterDateType === 'today') filterDesc = 'Hari Ini';
+                    else if (this.ownerFilterDateType === 'tomorrow') filterDesc = 'Besok';
+                    else if (this.ownerFilterDateType === 'this_week') filterDesc = 'Minggu Ini';
+                    else if (this.ownerFilterDateType === 'custom') filterDesc = `Tanggal ${this.ownerFilterCustomDate}`;
+
+                    this.deleteModal = {
+                        isOpen: true,
+                        title: 'Hapus Berdasarkan Filter',
+                        message: `Anda akan menghapus ${count} pesanan yang sesuai dengan filter aktif (${filterDesc}). Tindakan ini tidak dapat dibatalkan. Lanjutkan?`,
+                        type: 'filtered',
+                        targetId: null
+                    };
+                },
+
+                confirmDeleteProduct(productId, productName) {
+                    this.deleteModal = {
+                        isOpen: true,
+                        title: 'Hapus Menu Katalog',
+                        message: `Apakah Anda yakin ingin menghapus menu "${productName}" dari daftar katalog?`,
+                        type: 'product',
+                        targetId: productId
+                    };
+                },
+
+                async executeDeleteAction() {
+                    const type = this.deleteModal.type;
+                    const targetId = this.deleteModal.targetId;
+                    this.deleteModal.isOpen = false;
+
+                    if (type === 'single') {
+                        this.orders = this.orders.filter(o => o.id !== targetId);
                         this.showToast('Pesanan berhasil dihapus.', 'info');
 
                         try {
@@ -1404,12 +1502,38 @@
                                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                                 body: JSON.stringify({
                                     action: 'deleteOrder',
-                                    orderId: orderId
+                                    orderId: targetId
                                 })
                             });
                         } catch (e) {
                             console.error('Gagal hapus order di Sheet:', e);
                         }
+                    } 
+                    else if (type === 'filtered') {
+                        const idsToDelete = this.filteredOrders.map(o => o.id);
+                        this.orders = this.orders.filter(o => !idsToDelete.includes(o.id));
+                        this.showToast(`${idsToDelete.length} pesanan berhasil dihapus dari filter aktif.`, 'info');
+
+                        idsToDelete.forEach(id => {
+                            try {
+                                fetch(this.apiUrl, {
+                                    method: 'POST',
+                                    mode: 'no-cors',
+                                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                    body: JSON.stringify({
+                                        action: 'deleteOrder',
+                                        orderId: id
+                                    })
+                                });
+                            } catch (e) {
+                                console.error(`Gagal hapus order ${id} di Sheet:`, e);
+                            }
+                        });
+                    }
+                    else if (type === 'product') {
+                        this.products = this.products.filter(p => p.id !== targetId);
+                        this.saveMenuToSheet();
+                        this.showToast('Menu berhasil dihapus dari katalog.', 'info');
                     }
                 },
 
@@ -1494,14 +1618,6 @@
                     product.is_available = !product.is_available;
                     this.saveMenuToSheet();
                     this.showToast('Status ketersediaan menu diperbarui.', 'info');
-                },
-
-                deleteProduct(id) {
-                    if (confirm('Hapus menu ini?')) {
-                        this.products = this.products.filter(p => p.id !== id);
-                        this.saveMenuToSheet();
-                        this.showToast('Menu berhasil dihapus.', 'info');
-                    }
                 },
 
                 async saveMenuToSheet() {
