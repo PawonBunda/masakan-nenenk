@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dapur Selero - Sistem Pre-Order Kuliner</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Font Awesome Icons & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Vue 3 Production CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        [v-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-brand-500 selection:text-white h-full flex flex-col">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+
+        <!-- HEADER / NAVIGATION -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+            <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+                <!-- Brand Logo & Title -->
+                <div class="flex items-center space-x-2.5 cursor-pointer min-w-0" @click="currentView = 'customer'">
+                    <img src="logo.png" alt="Logo Dapur Selero" class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover shadow-sm border border-slate-100 flex-shrink-0" onerror="this.src='https://placehold.co/100x100/ea580c/ffffff?text=Logo'">
+                    <div class="min-w-0">
+                        <h1 class="font-bold text-sm sm:text-lg leading-tight text-slate-900 truncate">Masakan Nenek</h1>
+                        <p class="text-[10px] sm:text-xs text-slate-500 truncate">Masakan Rumahan Khas Minang</p>
+                    </div>
+                </div>
+
+                <!-- Nav Controls -->
+                <div class="flex items-center space-x-1.5 sm:space-x-4 flex-shrink-0">
+                    <div class="bg-slate-100 p-1 rounded-xl flex items-center text-[11px] sm:text-sm font-medium border border-slate-200">
+                        <button 
+                            @click="currentView = 'customer'"
+                            :class="currentView === 'customer' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            class="px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-store"></i>
+                            <span class="hidden xs:inline sm:inline">Pemesan</span>
+                        </button>
+                        <button 
+                            @click="openOwnerView"
+                            :class="currentView === 'owner' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            class="px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 relative">
+                            <i class="fa-solid fa-chart-pie"></i>
+                            <span class="hidden xs:inline sm:inline">Admin</span>
+                            <span v-if="pendingOrdersCount > 0" class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping absolute -top-1 -right-1"></span>
+                            <span v-if="pendingOrdersCount > 0" class="w-2.5 h-2.5 rounded-full bg-red-500 absolute -top-1 -right-1"></span>
+                        </button>
+                    </div>
+
+                    <!-- Cart Trigger Button -->
+                    <button 
+                        v-if="currentView === 'customer'"
+                        @click="isCartOpen = true"
+                        class="relative p-2.5 bg-brand-50 text-brand-600 hover:bg-brand-100 rounded-xl transition-all border border-brand-200/60 flex items-center justify-center">
+                        <i class="fa-solid fa-basket-shopping text-base sm:text-lg"></i>
+                        <span v-if="cartTotalItems > 0" class="absolute -top-1.5 -right-1.5 bg-brand-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
+                            {{ cartTotalItems }}
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-grow">
+            <!-- ================= VIEW 1: CUSTOMER VIEW ================= -->
+            <section v-if="currentView === 'customer'" class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
+                <!-- Menu Controls -->
+                <div class="space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0">
+                            <button 
+                                v-for="cat in menuCategories" 
+                                :key="cat"
+                                @click="selectedCategory = cat"
+                                :class="selectedCategory === cat ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'"
+                                class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all">
+                                {{ cat }}
+                            </button>
+                        </div>
+
+                        <div class="relative w-full sm:w-64">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input 
+                                v-model="menuSearchQuery" 
+                                type="text" 
+                                placeholder="Cari menu..." 
+                                class="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all shadow-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
+                    <div 
+                        v-for="product in filteredProducts" 
+                        :key="product.id"
+                        class="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group relative">
+                        
+                        <div class="relative h-36 sm:h-48 bg-slate-100 overflow-hidden">
+                            <img 
+                                :src="product.gambar || product.image || 'https://placehold.co/600x400/ea580c/ffffff?text=Dapur+Selera'" 
+                                :alt="product.nama || product.name" 
+                                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                :class="{'grayscale opacity-60': !product.is_available || product.stok <= 0}">
+                            
+                            <span class="absolute top-2 left-2 sm:top-3 sm:left-3 bg-white/95 backdrop-blur-md text-slate-800 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg shadow-sm">
+                                {{ product.kategori || product.category }}
+                            </span>
+
+                            <span v-if="!product.is_available || product.stok <= 0" class="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center text-white font-extrabold text-xs sm:text-sm uppercase tracking-wider text-center p-2">
+                                Stok Habis
+                            </span>
+                        </div>
+
+                        <div class="p-3 sm:p-4 flex-grow flex flex-col justify-between space-y-2.5 sm:space-y-3">
+                            <div>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base group-hover:text-brand-600 transition-colors line-clamp-1">{{ product.nama || product.name }}</h3>
+                                <p class="text-slate-500 text-[11px] sm:text-xs line-clamp-2 mt-0.5 sm:mt-1 leading-relaxed">{{ product.deskripsi || product.description }}</p>
+                                <div class="mt-1.5 flex items-center justify-between text-[11px]">
+                                    <span class="text-slate-400 font-medium">Stok: <strong :class="product.stok > 0 ? 'text-emerald-600' : 'text-red-500'">{{ product.stok ?? 0 }} porsi</strong></span>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 sm:pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                    <span class="text-[9px] sm:text-[10px] text-slate-400 font-medium block">Harga</span>
+                                    <span class="text-brand-600 font-extrabold text-xs sm:text-base">{{ formatRupiah(product.harga || product.price) }}</span>
+                                </div>
+                                <button 
+                                    @click="addToCart(product)"
+                                    :disabled="!product.is_available || product.stok <= 0"
+                                    :class="product.is_available && product.stok > 0 ? 'bg-brand-600 hover:bg-brand-700 text-white shadow-md shadow-brand-500/20 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'"
+                                    class="w-full sm:w-auto px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all">
+                                    <i class="fa-solid fa-plus"></i>
+                                    <span>Pesan</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW 2: OWNER DASHBOARD ================= -->
+            <section v-if="currentView === 'owner'" class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
+                <!-- Dashboard Top Banner -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-lg">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-emerald-500/20 text-emerald-400 text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full font-medium border border-emerald-500/30 flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Mode Admin Terverifikasi
+                            </span>
+                        </div>
+                        <h2 class="text-xl sm:text-2xl font-bold mt-1">Dashboard Kelola PO & Rekap Dapur</h2>
+                        <p class="text-slate-400 text-xs mt-0.5">Kelola pesanan, rekapitulasi porsi dapur, dan data menu langsung tersinkronisasi ke Google Sheets.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button 
+                            @click="syncData" 
+                            :disabled="isLoading"
+                            class="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <i class="fa-solid fa-rotate" :class="{'animate-spin': isLoading}"></i>
+                            <span>{{ isLoading ? 'Sinkronisasi...' : 'Sinkronkan Google Sheets' }}</span>
+                        </button>
+                        <button 
+                            @click="lockOwnerView" 
+                            class="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <i class="fa-solid fa-lock"></i> Kunci Admin
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base sm:text-xl font-bold flex-shrink-0">
+                            <i class="fa-solid fa-receipt"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] sm:text-xs font-medium text-slate-500 truncate">Total Pesanan</p>
+                            <h3 class="text-lg sm:text-2xl font-black text-slate-900 mt-0.5">{{ stats.totalOrders }}</h3>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base sm:text-xl font-bold flex-shrink-0">
+                            <i class="fa-solid fa-utensils"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] sm:text-xs font-medium text-slate-500 truncate">Total Porsi</p>
+                            <h3 class="text-lg sm:text-2xl font-black text-slate-900 mt-0.5">{{ stats.totalPortions }} <span class="text-[10px] sm:text-xs font-normal text-slate-500">porsi</span></h3>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base sm:text-xl font-bold flex-shrink-0">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] sm:text-xs font-medium text-slate-500 truncate">Total Omset PO</p>
+                            <h3 class="text-sm sm:text-xl font-black text-slate-900 mt-0.5 truncate">{{ formatRupiah(stats.totalRevenue) }}</h3>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-base sm:text-xl font-bold flex-shrink-0">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] sm:text-xs font-medium text-slate-500 truncate">Menunggu Konfirmasi</p>
+                            <h3 class="text-lg sm:text-2xl font-black text-orange-600 mt-0.5">{{ stats.pendingOrders }}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs & Toolbar -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 border-b border-slate-100 pb-3">
+                        <button 
+                            @click="ownerTab = 'customers'"
+                            :class="ownerTab === 'customers' ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-users"></i>
+                            <span>1. Detail Pesanan Pelanggan</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded-md text-[11px]">{{ filteredOrders.length }}</span>
+                        </button>
+                        <button 
+                            @click="ownerTab = 'kitchen'"
+                            :class="ownerTab === 'kitchen' ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-kitchen-set"></i>
+                            <span>2. Rekap Porsi Dapur</span>
+                        </button>
+                        <button 
+                            @click="ownerTab = 'settings'"
+                            :class="ownerTab === 'settings' ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-sliders"></i>
+                            <span>3. Kelola Menu & Pengaturan</span>
+                        </button>
+                    </div>
+
+                    <!-- Filter Controls -->
+                    <div v-if="ownerTab !== 'settings'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Filter Tanggal PO</label>
+                            <select 
+                                v-model="ownerFilterDateType" 
+                                class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                <option value="all">Semua Pesanan (Semua Tanggal)</option>
+                                <option value="today">Hari Ini</option>
+                                <option value="tomorrow">Besok</option>
+                                <option value="this_week">Minggu Ini</option>
+                                <option value="custom">Pilih Tanggal Spesifik...</option>
+                            </select>
+                        </div>
+
+                        <div v-if="ownerFilterDateType === 'custom'">
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal Spesifik</label>
+                            <input 
+                                v-model="ownerFilterCustomDate" 
+                                type="date" 
+                                class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Filter Status</label>
+                            <select 
+                                v-model="ownerFilterStatus" 
+                                class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                <option value="all">Semua Status</option>
+                                <option value="Menunggu Konfirmasi">Menunggu Konfirmasi</option>
+                                <option value="Diproses / Dimasak">Diproses / Dimasak</option>
+                                <option value="Selesai">Selesai</option>
+                                <option value="Dibatalkan">Dibatalkan</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Pencarian Nama / ID</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input 
+                                    v-model="ownerSearchQuery" 
+                                    type="text" 
+                                    placeholder="Cari Nama / ID Order..." 
+                                    class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 1: DETAIL PESANAN -->
+                <div v-if="ownerTab === 'customers'" class="space-y-4">
+                    <div v-if="filteredOrders.length === 0" class="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
+                        <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto text-2xl">
+                            <i class="fa-solid fa-inbox"></i>
+                        </div>
+                        <h4 class="font-bold text-slate-700 text-base">Tidak ada pesanan ditemukan</h4>
+                        <p class="text-slate-400 text-xs max-w-sm mx-auto">Coba ubah filter tanggal, status, atau pencarian Anda.</p>
+                    </div>
+
+                    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div 
+                            v-for="order in filteredOrders" 
+                            :key="order.id"
+                            class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden">
+                            
+                            <div class="p-4 border-b border-slate-100 space-y-2 bg-slate-50/50">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-extrabold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                                        {{ order.id }}
+                                    </span>
+                                    <span 
+                                        :class="getStatusBadgeClass(order.status)"
+                                        class="text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                                        <i :class="getStatusIconClass(order.status)"></i>
+                                        {{ getStatusLabel(order.status) }}
+                                    </span>
+                                </div>
+
+                                <div class="pt-1">
+                                    <h3 class="font-bold text-slate-900 text-lg">{{ order.nama_pemesan || order.customerName }}</h3>
+                                    <div class="flex items-center justify-between text-xs text-slate-500 mt-1">
+                                        <span class="flex items-center gap-1.5 font-semibold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-200/60">
+                                            <i class="fa-regular fa-calendar-check text-brand-600"></i>
+                                            Tanggal PO: <strong>{{ formatDateIndo(order.tanggal_po || order.poDate) }}</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-4 flex-grow space-y-3">
+                                <div>
+                                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Item Dipesan:</p>
+                                    <div class="space-y-2">
+                                        <div 
+                                            v-for="(item, idx) in getItemList(order.items)" 
+                                            :key="idx" 
+                                            class="flex justify-between items-start text-xs border-b border-slate-50 pb-1.5 last:border-0">
+                                            <div>
+                                                <span class="font-semibold text-slate-800">{{ item.nama || item.name }}</span>
+                                                <span class="text-slate-400 font-normal ml-1">x{{ item.jumlah || item.qty }}</span>
+                                            </div>
+                                            <span class="font-bold text-slate-700">{{ formatRupiah((item.harga || item.price) * (item.jumlah || item.qty)) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="order.catatan || order.notes" class="bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-xs space-y-0.5">
+                                    <span class="font-bold text-amber-800 text-[10px] block uppercase">Catatan Pelanggan:</span>
+                                    <p class="text-amber-900 italic text-[11px]">{{ order.catatan || order.notes }}</p>
+                                </div>
+
+                                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                    <span class="text-xs font-medium text-slate-500">Total Tagihan:</span>
+                                    <span class="text-base font-extrabold text-brand-600">{{ formatRupiah(order.total_harga || order.total) }}</span>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                                <div class="flex items-center gap-1.5 flex-grow flex-wrap sm:flex-nowrap">
+                                    <button 
+                                        v-if="order.status === 'Menunggu Konfirmasi' || order.status === 'pending'"
+                                        @click="updateOrderStatus(order.id, 'Diproses / Dimasak')" 
+                                        class="flex-grow bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1">
+                                        <i class="fa-solid fa-check"></i> Terima & Masak
+                                    </button>
+
+                                    <button 
+                                        v-if="order.status === 'Diproses / Dimasak' || order.status === 'processing'"
+                                        @click="updateOrderStatus(order.id, 'Selesai')" 
+                                        class="flex-grow bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1">
+                                        <i class="fa-solid fa-box-archive"></i> Selesaikan
+                                    </button>
+
+                                    <button 
+                                        v-if="order.status !== 'Dibatalkan' && order.status !== 'Selesai'"
+                                        @click="updateOrderStatus(order.id, 'Dibatalkan')" 
+                                        class="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-xs font-semibold py-2 px-2.5 rounded-xl transition-all">
+                                        <i class="fa-solid fa-xmark"></i> Batalkan
+                                    </button>
+
+                                    <button 
+                                        @click="deleteOrder(order.id)" 
+                                        class="text-slate-400 hover:text-red-600 p-2 text-xs transition-colors"
+                                        title="Hapus Pesanan">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: REKAP PORSI DAPUR -->
+                <div v-if="ownerTab === 'kitchen'" class="space-y-4">
+                    <div class="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3 text-amber-900 text-xs">
+                        <i class="fa-solid fa-lightbulb text-amber-600 text-lg mt-0.5"></i>
+                        <div>
+                            <h5 class="font-bold">Informasi Rekap Dapur:</h5>
+                            <p>Total porsi yang harus dimasak berdasarkan pesanan aktif pada filter tanggal yang dipilih.</p>
+                        </div>
+                    </div>
+
+                    <div v-if="kitchenSummary.length === 0" class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 text-xs">
+                        Tidak ada porsi menu yang perlu disiapkan untuk filter saat ini.
+                    </div>
+
+                    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div 
+                            v-for="summary in kitchenSummary" 
+                            :key="summary.name"
+                            class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ summary.category }}</span>
+                                <h4 class="font-bold text-slate-900 text-base">{{ summary.name }}</h4>
+                                <p class="text-xs text-slate-500">Total Dipesan Pelanggan</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-3xl font-black text-brand-600 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-2xl inline-block">
+                                    {{ summary.totalQty }}
+                                </span>
+                                <span class="block text-[10px] font-semibold text-slate-400 mt-1 uppercase">Porsi</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: KELOLA MENU & SETTINGS -->
+                <div v-if="ownerTab === 'settings'" class="space-y-6">
+                    <!-- PENGATURAN JAM TUTUP ORDER (CUT-OFF) -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                        <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <i class="fa-solid fa-clock text-brand-600"></i> Pengaturan Jam Tutup Order (Cut-off) Per Hari
+                        </h4>
+
+                        <div class="space-y-4">
+                            <!-- Pilihan Tombol / Tab Hari -->
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Pilih Hari yang Ingin Disetting:</label>
+                                <div class="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none -mx-2 px-2">
+                                    <button 
+                                        v-for="(schedule, day) in operatingHours" 
+                                        :key="day"
+                                        @click="selectedOperatingDay = day"
+                                        :class="selectedOperatingDay === day ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'"
+                                        class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5">
+                                        <span>{{ day }}</span>
+                                        <span class="w-1.5 h-1.5 rounded-full" :class="schedule.isOpen ? 'bg-emerald-400' : 'bg-red-400'"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Panel Detail Hari yang Dipilih -->
+                            <div v-if="selectedOperatingDay && operatingHours[selectedOperatingDay]" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                                <div class="flex items-center justify-between border-b border-slate-200/60 pb-3">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs font-bold text-slate-400 uppercase">Pengaturan Hari:</span>
+                                        <span class="text-sm font-extrabold text-slate-900">{{ selectedOperatingDay }}</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-medium text-slate-600">Status Toko:</span>
+                                        <button 
+                                            @click="operatingHours[selectedOperatingDay].isOpen = !operatingHours[selectedOperatingDay].isOpen"
+                                            :class="operatingHours[selectedOperatingDay].isOpen ? 'bg-emerald-600 text-white' : 'bg-red-500 text-white'"
+                                            class="px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-sm">
+                                            {{ operatingHours[selectedOperatingDay].isOpen ? 'Buka' : 'Tutup / Libur' }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Input Jam Tutup -->
+                                <div v-if="operatingHours[selectedOperatingDay].isOpen" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-800 block">Batas Jam Tutup (Cut-off)</span>
+                                        <span class="text-[11px] text-slate-500">Pelanggan tidak bisa memesan melebihi jam ini untuk hari {{ selectedOperatingDay }}.</span>
+                                    </div>
+                                    <input 
+                                        type="time" 
+                                        v-model="operatingHours[selectedOperatingDay].closeTime" 
+                                        class="px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm">
+                                </div>
+
+                                <div v-else class="text-center py-3 text-xs text-red-500 font-semibold italic bg-red-50 rounded-xl border border-red-100">
+                                    Toko tutup / libur total pada hari {{ selectedOperatingDay }}.
+                                </div>
+                            </div>
+
+                            <button @click="saveJamPOToSheet" class="w-full mt-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-xl text-xs transition-all shadow-sm">
+                                Simpan Pengaturan Jam Order (Jam PO)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                            <h3 class="font-bold text-slate-900 text-base border-b border-slate-100 pb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-plus-circle text-brand-600"></i> Tambah Menu PO Baru
+                            </h3>
+
+                            <form @submit.prevent="addNewProduct" class="space-y-3 text-xs">
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">Nama Menu</label>
+                                    <input v-model="newProduct.nama" required type="text" placeholder="Contoh: Nasi Rendang Daging" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-semibold text-slate-600 mb-1">Harga (Rp)</label>
+                                        <input v-model.number="newProduct.harga" required type="number" placeholder="25000" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    </div>
+                                    <div>
+                                        <label class="block font-semibold text-slate-600 mb-1">Stok Awal</label>
+                                        <input v-model.number="newProduct.stok" required type="number" placeholder="10" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">Kategori</label>
+                                    <select v-model="newProduct.kategori" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                        <option value="Makanan Utama">Makanan Utama</option>
+                                        <option value="Camilan & Snack">Camilan & Snack</option>
+                                        <option value="Minuman">Minuman</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">URL Gambar</label>
+                                    <input v-model="newProduct.gambar" type="text" placeholder="https://..." class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                </div>
+
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">Deskripsi Menu</label>
+                                    <textarea v-model="newProduct.deskripsi" rows="2" placeholder="Deskripsi singkat..." class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"></textarea>
+                                </div>
+
+                                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl transition-all shadow-md shadow-brand-500/20">
+                                    Simpan Menu Baru
+                                </button>
+                            </form>
+
+                            <!-- PENGATURAN SYSTEM -->
+                            <div class="pt-5 border-t border-slate-100 space-y-4">
+                                <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                    <i class="fa-solid fa-gear text-slate-600"></i> Pengaturan Sistem (Google Sheets)
+                                </h4>
+
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1 text-xs">Nomor WhatsApp Owner (Tujuan Order)</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="ownerWhatsapp" type="text" placeholder="628123456789" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                        <button @click="updateWhatsapp" :disabled="isLoading" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shadow-sm">
+                                            Simpan WA
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1 text-xs">Ubah PIN Dashboard Owner</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="newPinInput" type="password" maxlength="6" placeholder="PIN Baru" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                        <button @click="changePin" :disabled="isLoading" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shadow-sm">
+                                            Simpan PIN
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                            <h3 class="font-bold text-slate-900 text-base border-b border-slate-100 pb-3 flex items-center justify-between">
+                                <span>Daftar Katalog Menu ({{ products.length }})</span>
+                            </h3>
+
+                            <div class="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                                <div 
+                                    v-for="product in products" 
+                                    :key="product.id"
+                                    class="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-slate-200 rounded-xl hover:border-slate-300 transition-all bg-slate-50/50 gap-3">
+                                    <div class="flex items-center space-x-3">
+                                        <img :src="product.gambar || product.image" class="w-12 h-12 object-cover rounded-lg border border-slate-200 flex-shrink-0">
+                                        <div class="min-w-0">
+                                            <h4 class="font-bold text-slate-800 text-sm truncate">{{ product.nama || product.name }}</h4>
+                                            <p class="text-xs text-brand-600 font-semibold">{{ formatRupiah(product.harga || product.price) }} <span class="text-slate-400 font-normal">({{ product.kategori || product.category }})</span></p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center space-x-2 justify-end flex-wrap sm:flex-nowrap">
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-[11px] text-slate-500 font-medium">Stok:</span>
+                                            <input 
+                                                type="number" 
+                                                v-model.number="product.stok" 
+                                                @change="updateProductStock(product)"
+                                                class="w-16 px-2 py-1 text-xs border border-slate-200 rounded-lg text-center font-bold focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                        </div>
+                                        <button 
+                                            @click="toggleProductAvailability(product)"
+                                            :class="product.is_available && product.stok > 0 ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'"
+                                            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                                            {{ product.is_available && product.stok > 0 ? 'Tersedia' : 'Habis' }}
+                                        </button>
+                                        <button 
+                                            @click="deleteProduct(product.id)" 
+                                            class="p-2 text-slate-400 hover:text-red-600 transition-colors text-xs">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ================= MODAL PIN SECURITY ================= -->
+        <div v-if="isPinModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 text-center space-y-5">
+                <div class="w-16 h-16 bg-brand-50 text-brand-600 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-xl">Masukkan PIN Owner</h3>
+                    <p class="text-xs text-slate-500 mt-1">Gunakan PIN untuk mengakses Dashboard Admin.</p>
+                </div>
+
+                <form @submit.prevent="verifyPin" class="space-y-4">
+                    <input 
+                        v-model="pinInput" 
+                        type="password" 
+                        maxlength="6" 
+                        placeholder="••••" 
+                        autofocus
+                        class="w-full text-center text-2xl tracking-[0.5em] font-bold py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-500">
+
+                    <div class="grid grid-cols-2 gap-2 pt-2">
+                        <button 
+                            type="button" 
+                            @click="isPinModalOpen = false" 
+                            class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all">
+                            Batal
+                        </button>
+                        <button 
+                            type="submit" 
+                            class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-brand-500/20">
+                            Masuk
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ================= CART DRAWER / CHECKOUT ================= -->
+        <div v-if="isCartOpen" class="fixed inset-0 z-50 overflow-hidden">
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" @click="isCartOpen = false"></div>
+
+            <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
+                <div class="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between">
+                    
+                    <div class="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-basket-shopping text-brand-600 text-lg"></i>
+                            <h3 class="font-bold text-slate-900 text-lg">Keranjang PO Anda</h3>
+                        </div>
+                        <button @click="isCartOpen = false" class="text-slate-400 hover:text-slate-600 p-1">
+                            <i class="fa-solid fa-xmark text-xl"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-4 sm:p-6 flex-grow overflow-y-auto space-y-6">
+                        <div v-if="cart.length === 0" class="text-center py-12 space-y-3">
+                            <i class="fa-solid fa-cart-flatbed text-4xl text-slate-300"></i>
+                            <p class="text-slate-500 text-xs">Keranjang Anda masih kosong.<br/>Pilih menu PO favorit Anda!</p>
+                        </div>
+
+                        <div v-else class="space-y-4">
+                            <div 
+                                v-for="(item, index) in cart" 
+                                :key="item.id"
+                                class="flex gap-3 border-b border-slate-100 pb-4">
+                                <img :src="item.gambar || item.image" class="w-16 h-16 object-cover rounded-xl border border-slate-200 flex-shrink-0">
+                                <div class="flex-grow space-y-1 min-w-0">
+                                    <div class="flex justify-between items-start gap-2">
+                                        <h4 class="font-bold text-slate-800 text-xs sm:text-sm truncate">{{ item.nama || item.name }}</h4>
+                                        <button @click="removeFromCart(index)" class="text-slate-300 hover:text-red-500 text-xs flex-shrink-0">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <p class="text-brand-600 font-bold text-xs">{{ formatRupiah(item.harga || item.price) }}</p>
+
+                                    <div class="flex items-center justify-between pt-1">
+                                        <div class="flex items-center space-x-2 bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                                            <button @click="updateCartQty(index, -1)" class="w-6 h-6 flex items-center justify-center text-xs text-slate-600 hover:bg-white rounded">-</button>
+                                            <span class="text-xs font-bold px-1">{{ item.jumlah }}</span>
+                                            <button @click="updateCartQty(index, 1)" class="w-6 h-6 flex items-center justify-center text-xs text-slate-600 hover:bg-white rounded">+</button>
+                                        </div>
+                                        <span class="text-xs font-extrabold text-slate-800">{{ formatRupiah((item.harga || item.price) * item.jumlah) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Form Pemesan -->
+                            <div class="pt-4 border-t border-slate-200 space-y-3">
+                                <h4 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                                    <i class="fa-solid fa-user-pen text-brand-600"></i> Form Pemesan
+                                </h4>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Nama Lengkap *</label>
+                                    <input v-model="checkoutForm.name" required type="text" placeholder="Masukkan nama Anda" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Tanggal PO (Pengiriman/Ambil) *</label>
+                                    <input v-model="checkoutForm.poDate" required type="date" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Catatan Tambahan (Opsional)</label>
+                                    <textarea v-model="checkoutForm.notes" rows="2" placeholder="Contoh: Bungkusan terpisah, jam 12 siang..." class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="cart.length > 0" class="p-4 sm:p-6 border-t border-slate-200 bg-slate-50 space-y-3">
+                        <div class="flex justify-between items-center text-sm font-bold text-slate-900">
+                            <span>Total Pembayaran</span>
+                            <span class="text-lg text-brand-600">{{ formatRupiah(cartTotalAmount) }}</span>
+                        </div>
+
+                        <button 
+                            @click="submitCheckout" 
+                            :disabled="isLoading"
+                            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
+                            <i class="fa-brands fa-whatsapp text-lg"></i>
+                            <span>{{ isLoading ? 'Memproses Pesanan...' : 'Pesan Sekarang (Buka WhatsApp)' }}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-400">
+            <p>&copy; 2026 Dapur Selero - Pre-Order Kuliner System.</p>
+        </footer>
+    </div>
+
+    <!-- VUE 3 LOGIC APP -->
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentView: 'customer',
+                    isPinModalOpen: false,
+                    pinInput: '',
+                    ownerPin: '1234',
+                    newPinInput: '',
+                    isOwnerAuthenticated: false,
+                    
+                    ownerTab: 'customers',
+                    isCartOpen: false,
+                    selectedCategory: 'Semua',
+                    menuSearchQuery: '',
+
+                    ownerFilterDateType: 'all',
+                    ownerFilterCustomDate: '',
+                    ownerFilterStatus: 'all',
+                    ownerSearchQuery: '',
+                    
+                    ownerWhatsapp: '6281234567890',
+                    apiUrl: 'https://script.google.com/macros/s/AKfycbxaOAKyRyiEK-skiZ-yfHut7_QQTDaVQnRPoUg7wa3PAobIUrhF8T14coOWnudc_V4byg/exec',
+                    isLoading: false,
+
+                    checkoutForm: {
+                        name: '',
+                        poDate: new Date().toISOString().split('T')[0],
+                        notes: ''
+                    },
+
+                    newProduct: {
+                        nama: '',
+                        harga: null,
+                        kategori: 'Makanan Utama',
+                        gambar: '',
+                        deskripsi: '',
+                        stok: 10,
+                        is_available: true
+                    },
+
+                    selectedOperatingDay: 'Senin',
+                    operatingHours: {
+                        'Senin': { isOpen: true, closeTime: '22:00' },
+                        'Selasa': { isOpen: true, closeTime: '22:00' },
+                        'Rabu': { isOpen: true, closeTime: '22:00' },
+                        'Kamis': { isOpen: true, closeTime: '22:00' },
+                        'Jumat': { isOpen: true, closeTime: '22:00' },
+                        'Sabtu': { isOpen: true, closeTime: '22:00' },
+                        'Minggu': { isOpen: true, closeTime: '22:00' }
+                    },
+                    
+                    cart: [],
+                    products: [],
+                    orders: []
+                };
+            },
+
+            computed: {
+                menuCategories() {
+                    const cats = ['Semua'];
+                    this.products.forEach(p => {
+                        const c = p.kategori || p.category;
+                        if (c && !cats.includes(c)) cats.push(c);
+                    });
+                    return cats;
+                },
+
+                filteredProducts() {
+                    return this.products.filter(p => {
+                        const pCat = p.kategori || p.category || '';
+                        const pName = p.nama || p.name || '';
+                        const pDesc = p.deskripsi || p.description || '';
+
+                        const matchCategory = this.selectedCategory === 'Semua' || pCat === this.selectedCategory;
+                        const matchSearch = pName.toLowerCase().includes(this.menuSearchQuery.toLowerCase()) || 
+                                           pDesc.toLowerCase().includes(this.menuSearchQuery.toLowerCase());
+                        return matchCategory && matchSearch;
+                    });
+                },
+
+                filteredOrders() {
+                    return this.orders.filter(order => {
+                        const status = order.status || order.status_pesanan || order.orderStatus || 'Menunggu Konfirmasi';
+                        const name = order.nama_pemesan || order.customerName || order.nama || '';
+                        const id = order.id || order.orderId || '';
+                        const poDate = order.tanggal_po || order.poDate || order.tanggal || '';
+
+                        if (this.ownerFilterStatus && this.ownerFilterStatus !== 'all') {
+                            if (status.toLowerCase() !== this.ownerFilterStatus.toLowerCase()) return false;
+                        }
+
+                        if (this.ownerSearchQuery && this.ownerSearchQuery.trim() !== '') {
+                            const q = this.ownerSearchQuery.toLowerCase();
+                            const matchName = name.toLowerCase().includes(q);
+                            const matchId = String(id).toLowerCase().includes(q);
+                            if (!matchName && !matchId) return false;
+                        }
+
+                        if (this.ownerFilterDateType && this.ownerFilterDateType !== 'all') {
+                            let formattedPoDate = '';
+                            if (poDate) {
+                                const d = new Date(poDate);
+                                if (!isNaN(d.getTime())) {
+                                    const y = d.getFullYear();
+                                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                                    const dayPart = String(d.getDate()).padStart(2, '0');
+                                    formattedPoDate = `${y}-${m}-${dayPart}`;
+                                } else {
+                                    formattedPoDate = poDate.split('T')[0];
+                                }
+                            }
+
+                            const dNow = new Date();
+                            const year = dNow.getFullYear();
+                            const month = String(dNow.getMonth() + 1).padStart(2, '0');
+                            const day = String(dNow.getDate()).padStart(2, '0');
+                            const todayStr = `${year}-${month}-${day}`;
+
+                            const tom = new Date();
+                            tom.setDate(dNow.getDate() + 1);
+                            const tYear = tom.getFullYear();
+                            const tMonth = String(tom.getMonth() + 1).padStart(2, '0');
+                            const tDay = String(tom.getDate()).padStart(2, '0');
+                            const tomorrowStr = `${tYear}-${tMonth}-${tDay}`;
+
+                            if (this.ownerFilterDateType === 'today') {
+                                if (formattedPoDate !== todayStr) return false;
+                            } 
+                            else if (this.ownerFilterDateType === 'tomorrow') {
+                                if (formattedPoDate !== tomorrowStr) return false;
+                            }
+                            else if (this.ownerFilterDateType === 'this_week') {
+                                const dPo = new Date(poDate);
+                                const firstDayOfWeek = new Date(dNow);
+                                firstDayOfWeek.setDate(dNow.getDate() - dNow.getDay());
+                                const lastDayOfWeek = new Date(firstDayOfWeek);
+                                lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+                                if (dPo < firstDayOfWeek || dPo > lastDayOfWeek) return false;
+                            }
+                            else if (this.ownerFilterDateType === 'custom') {
+                                if (this.ownerFilterCustomDate && formattedPoDate !== this.ownerFilterCustomDate) return false;
+                            }
+                        }
+
+                        return true;
+                    });
+                },
+
+                kitchenSummary() {
+                    const summaryMap = {};
+                    this.filteredOrders.forEach(order => {
+                        if (order.status !== 'Dibatalkan' && order.status !== 'cancelled') {
+                            const items = this.getItemList(order.items);
+                            items.forEach(item => {
+                                const itemName = item.nama || item.name;
+                                const itemQty = Number(item.jumlah || item.qty || 0);
+                                const itemCat = item.kategori || item.category || 'Kuliner';
+
+                                if (!summaryMap[itemName]) {
+                                    summaryMap[itemName] = { name: itemName, totalQty: 0, category: itemCat };
+                                }
+                                summaryMap[itemName].totalQty += itemQty;
+                            });
+                        }
+                    });
+                    return Object.values(summaryMap).sort((a, b) => b.totalQty - a.totalQty);
+                },
+
+                stats() {
+                    let totalOrders = this.orders.length;
+                    let totalPortions = 0;
+                    let totalRevenue = 0;
+                    let pendingOrders = 0;
+
+                    this.orders.forEach(o => {
+                        const status = o.status || 'Menunggu Konfirmasi';
+                        if (status !== 'Dibatalkan' && status !== 'cancelled') {
+                            totalRevenue += Number(o.total_harga || o.total || 0);
+                            const items = this.getItemList(o.items);
+                            items.forEach(i => totalPortions += Number(i.jumlah || i.qty || 0));
+                        }
+                        if (status === 'Menunggu Konfirmasi' || status === 'pending') {
+                            pendingOrders++;
+                        }
+                    });
+
+                    return { totalOrders, totalPortions, totalRevenue, pendingOrders };
+                },
+
+                pendingOrdersCount() {
+                    return this.orders.filter(o => (o.status || 'pending') === 'Menunggu Konfirmasi' || o.status === 'pending').length;
+                },
+
+                cartTotalItems() {
+                    return this.cart.reduce((sum, item) => sum + item.jumlah, 0);
+                },
+
+                cartTotalAmount() {
+                    return this.cart.reduce((sum, item) => sum + ((item.harga || item.price) * item.jumlah), 0);
+                }
+            },
+
+            methods: {
+                formatRupiah(num) {
+                    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num || 0);
+                },
+
+                formatDateIndo(dateStr) {
+                    if (!dateStr) return '-';
+                    const d = new Date(dateStr);
+                    if (isNaN(d.getTime())) return dateStr;
+                    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                },
+
+                formatPhoneForWa(phone) {
+                    let cleaned = (phone || '').replace(/[^0-9]/g, '');
+                    if (cleaned.startsWith('0')) {
+                        cleaned = '62' + cleaned.slice(1);
+                    } else if (!cleaned.startsWith('62') && cleaned.length > 0) {
+                        cleaned = '62' + cleaned;
+                    }
+                    return cleaned;
+                },
+
+                getItemList(items) {
+                    if (Array.isArray(items)) return items;
+                    if (typeof items === 'string') {
+                        try { return JSON.parse(items); } catch(e) { return []; }
+                    }
+                    return [];
+                },
+
+                getStatusBadgeClass(status) {
+                    switch (status) {
+                        case 'Menunggu Konfirmasi':
+                        case 'pending': 
+                            return 'bg-amber-100 text-amber-800 border border-amber-300';
+                        case 'Diproses / Dimasak':
+                        case 'processing': 
+                            return 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+                        case 'Selesai':
+                        case 'completed': 
+                            return 'bg-blue-100 text-blue-800 border border-blue-300';
+                        case 'Dibatalkan':
+                        case 'cancelled': 
+                            return 'bg-red-100 text-red-800 border border-red-300';
+                        default: 
+                            return 'bg-slate-100 text-slate-800';
+                    }
+                },
+
+                getStatusIconClass(status) {
+                    switch (status) {
+                        case 'Menunggu Konfirmasi':
+                        case 'pending': return 'fa-solid fa-hourglass-half';
+                        case 'Diproses / Dimasak':
+                        case 'processing': return 'fa-solid fa-fire-burner';
+                        case 'Selesai':
+                        case 'completed': return 'fa-solid fa-circle-check';
+                        case 'Dibatalkan':
+                        case 'cancelled': return 'fa-solid fa-ban';
+                        default: return 'fa-solid fa-info';
+                    }
+                },
+
+                getStatusLabel(status) {
+                    if (status === 'pending') return 'Menunggu Konfirmasi';
+                    if (status === 'processing') return 'Diproses / Dimasak';
+                    if (status === 'completed') return 'Selesai';
+                    if (status === 'cancelled') return 'Dibatalkan';
+                    return status || 'Menunggu Konfirmasi';
+                },
+
+                openOwnerView() {
+                    if (this.isOwnerAuthenticated) {
+                        this.currentView = 'owner';
+                    } else {
+                        this.pinInput = '';
+                        this.isPinModalOpen = true;
+                    }
+                },
+
+                verifyPin() {
+                    if (this.pinInput === this.ownerPin) {
+                        this.isOwnerAuthenticated = true;
+                        this.isPinModalOpen = false;
+                        this.currentView = 'owner';
+                    } else {
+                        alert('PIN Salah! Mohon periksa kembali PIN Anda.');
+                        this.pinInput = '';
+                    }
+                },
+
+                lockOwnerView() {
+                    this.isOwnerAuthenticated = false;
+                    this.currentView = 'customer';
+                },
+
+                async changePin() {
+                    if (!this.newPinInput || this.newPinInput.length < 4) {
+                        alert('PIN minimal harus 4 digit!');
+                        return;
+                    }
+                    this.ownerPin = this.newPinInput;
+                    this.newPinInput = '';
+                    await this.saveSettingsToSheet('PIN Owner berhasil diperbarui di Google Sheets!');
+                },
+
+                async updateWhatsapp() {
+                    if (!this.ownerWhatsapp) {
+                        alert('Nomor WhatsApp tidak boleh kosong!');
+                        return;
+                    }
+                    await this.saveSettingsToSheet('Nomor WA Owner berhasil diperbarui di Google Sheets!');
+                },
+
+                async saveSettingsToSheet(successMsg = 'Pengaturan berhasil disimpan ke Google Sheets!') {
+                    this.isLoading = true;
+                    try {
+                        await fetch(this.apiUrl, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'saveSettings',
+                                settings: {
+                                    pin: this.ownerPin,
+                                    wa_owner: this.ownerWhatsapp
+                                }
+                            })
+                        });
+                        alert(successMsg);
+                    } catch (e) {
+                        console.error('Gagal simpan pengaturan:', e);
+                        alert('Gagal menyimpan pengaturan ke Google Sheets.');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async saveJamPOToSheet() {
+                    this.isLoading = true;
+                    try {
+                        await fetch(this.apiUrl, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'saveJamPO',
+                                jam_po: this.operatingHours
+                            })
+                        });
+                        alert('Pengaturan jam operasional (Jam PO) berhasil disimpan ke Google Sheets!');
+                    } catch (e) {
+                        console.error('Gagal simpan Jam PO:', e);
+                        alert('Gagal menyimpan Jam PO ke Google Sheets.');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                addToCart(product) {
+                    if (product.stok <= 0 || !product.is_available) {
+                        alert('Maaf, stok menu ini sudah habis!');
+                        return;
+                    }
+                    const existing = this.cart.find(item => item.id === product.id);
+                    if (existing) {
+                        if (existing.jumlah >= product.stok) {
+                            alert('Jumlah di keranjang sudah mencapai batas stok yang tersedia!');
+                            return;
+                        }
+                        existing.jumlah++;
+                    } else {
+                        this.cart.push({
+                            id: product.id,
+                            nama: product.nama || product.name,
+                            harga: Number(product.harga || product.price),
+                            gambar: product.gambar || product.image,
+                            kategori: product.kategori || product.category,
+                            jumlah: 1
+                        });
+                    }
+                },
+
+                removeFromCart(index) {
+                    this.cart.splice(index, 1);
+                },
+
+                updateCartQty(index, change) {
+                    const item = this.cart[index];
+                    if (item) {
+                        const product = this.products.find(p => p.id === item.id);
+                        const newQty = item.jumlah + change;
+                        if (newQty > 0) {
+                            if (product && newQty > product.stok) {
+                                alert('Stok tidak mencukupi!');
+                                return;
+                            }
+                            item.jumlah = newQty;
+                        } else {
+                            this.cart.splice(index, 1);
+                        }
+                    }
+                },
+
+                async submitCheckout() {
+                    if (!this.checkoutForm.name || !this.checkoutForm.poDate) {
+                        alert('Mohon isi Nama Lengkap dan Tanggal PO!');
+                        return;
+                    }
+                    
+                    if (this.isOrderTimeClosed(this.checkoutForm.poDate)) {
+                        alert('Maaf, batas waktu pemesanan (cut-off time) untuk tanggal PO tersebut sudah tutup atau sudah lewat jam operasional!');
+                        return;
+                    }
+
+                    // Validasi stok ulang sebelum checkout
+                    for (const cartItem of this.cart) {
+                        const prod = this.products.find(p => p.id === cartItem.id);
+                        if (!prod || prod.stok < cartItem.jumlah || !prod.is_available) {
+                            alert(`Maaf, stok untuk menu "${cartItem.nama}" tidak mencukupi atau sudah habis!`);
+                            return;
+                        }
+                    }
+
+                    this.isLoading = true;
+                    const orderId = 'PO-' + Math.floor(100000 + Math.random() * 900000);
+                    const cartItemsCopy = JSON.parse(JSON.stringify(this.cart));
+
+                    // Kurangi stok menu secara otomatis
+                    cartItemsCopy.forEach(cartItem => {
+                        const prod = this.products.find(p => p.id === cartItem.id);
+                        if (prod) {
+                            prod.stok = Math.max(0, Number(prod.stok) - Number(cartItem.jumlah));
+                            if (prod.stok === 0) {
+                                prod.is_available = false;
+                            }
+                        }
+                    });
+                    this.saveMenuToSheet();
+
+                    const orderData = {
+                        id: orderId,
+                        created_at: new Date().toISOString(),
+                        nama_pemesan: this.checkoutForm.name,
+                        tanggal_po: this.checkoutForm.poDate,
+                        catatan: this.checkoutForm.notes || '',
+                        items: cartItemsCopy,
+                        total_harga: this.cartTotalAmount,
+                        status: 'Menunggu Konfirmasi'
+                    };
+
+                    this.orders.unshift(orderData);
+
+                    try {
+                        fetch(this.apiUrl, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'addOrder',
+                                order: orderData
+                            })
+                        });
+                    } catch (e) {
+                        console.error('Gagal simpan ke Sheet:', e);
+                    }
+
+                    let targetWa = this.formatPhoneForWa(this.ownerWhatsapp);
+                    let msg = `*PESANAN PRE-ORDER BARU*\n`;
+                    msg += `-----------------------------------\n`;
+                    msg += `*ID Pesanan:* ${orderData.id}\n`;
+                    msg += `*Nama Pemesan:* ${orderData.nama_pemesan}\n`;
+                    msg += `*Tanggal PO:* ${this.formatDateIndo(orderData.tanggal_po)}\n`;
+                    msg += `-----------------------------------\n`;
+                    msg += `*Rincian Pesanan:*\n`;
+                    orderData.items.forEach(i => {
+                        msg += `• ${i.nama} x${i.jumlah} = ${this.formatRupiah((i.harga || i.price) * i.jumlah)}\n`;
+                    });
+                    msg += `-----------------------------------\n`;
+                    msg += `*Total Pembayaran:* ${this.formatRupiah(orderData.total_harga)}\n`;
+                    if (orderData.catatan) msg += `*Catatan:* ${orderData.catatan}\n`;
+                    msg += `-----------------------------------\n`;
+                    msg += `Mohon konfirmasi pesanan ini. Terima kasih!`;
+
+                    this.cart = [];
+                    this.checkoutForm.notes = '';
+                    this.isCartOpen = false;
+                    this.isLoading = false;
+
+                    window.open(`https://wa.me/${targetWa}?text=${encodeURIComponent(msg)}`, '_blank');
+                },
+
+                async updateOrderStatus(orderId, newStatus) {
+                    const order = this.orders.find(o => o.id === orderId);
+                    if (order) {
+                        order.status = newStatus;
+
+                        try {
+                            fetch(this.apiUrl, {
+                                method: 'POST',
+                                mode: 'no-cors',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    action: 'updateOrderStatus',
+                                    orderId: orderId,
+                                    newStatus: newStatus
+                                })
+                            });
+                        } catch (e) {
+                            console.error('Gagal update status di Sheet:', e);
+                        }
+                    }
+                },
+
+                async deleteOrder(orderId) {
+                    if (confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) {
+                        this.orders = this.orders.filter(o => o.id !== orderId);
+
+                        try {
+                            fetch(this.apiUrl, {
+                                method: 'POST',
+                                mode: 'no-cors',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    action: 'deleteOrder',
+                                    orderId: orderId
+                                })
+                            });
+                        } catch (e) {
+                            console.error('Gagal hapus order di Sheet:', e);
+                        }
+                    }
+                },
+
+                formatDriveUrlForSave(url) {
+                    if (!url) return '';
+                    if (url.includes('drive.google.com')) {
+                        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                        if (match && match[1]) {
+                            return `https://lh3.googleusercontent.com/d/${match[1]}`;
+                        }
+                    }
+                    return url;
+                },
+
+                isOrderTimeClosed(poDateStr) {
+                    if (!poDateStr) return false;
+                    
+                    const dateObj = new Date(poDateStr);
+                    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                    const dayName = days[dateObj.getDay()];
+                    
+                    const schedule = this.operatingHours[dayName];
+                    if (!schedule || !schedule.isOpen) return true; 
+                    
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    if (poDateStr === todayStr) {
+                        const now = new Date();
+                        const currentHours = String(now.getHours()).padStart(2, '0');
+                        const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+                        const currentTimeStr = `${currentHours}:${currentMinutes}`;
+                        
+                        if (currentTimeStr > schedule.closeTime) {
+                            return true; 
+                        }
+                    }
+                    return false;
+                },
+
+                async addNewProduct() {
+                    if (!this.newProduct.nama || !this.newProduct.harga) return;
+
+                    let finalImageUrl = this.formatDriveUrlForSave(this.newProduct.gambar);
+                    const initialStock = Number(this.newProduct.stok || 0);
+
+                    const productObj = {
+                        id: Date.now(),
+                        nama: this.newProduct.nama,
+                        harga: Number(this.newProduct.harga),
+                        kategori: this.newProduct.kategori,
+                        gambar: finalImageUrl || 'https://placehold.co/600x400/ea580c/ffffff?text=' + encodeURIComponent(this.newProduct.nama),
+                        deskripsi: this.newProduct.deskripsi || 'Sajian lezat siap di-order.',
+                        stok: initialStock,
+                        is_available: initialStock > 0
+                    };
+
+                    this.products.push(productObj);
+                    this.newProduct = { nama: '', harga: null, kategori: 'Makanan Utama', gambar: '', deskripsi: '', stok: 10, is_available: true };
+                    this.saveMenuToSheet();
+                },
+
+                updateProductStock(product) {
+                    if (product.stok === undefined || product.stok === null || product.stok < 0) {
+                        product.stok = 0;
+                    }
+                    if (product.stok === 0) {
+                        product.is_available = false;
+                    } else {
+                        product.is_available = true;
+                    }
+                    this.saveMenuToSheet();
+                },
+
+                toggleProductAvailability(product) {
+                    if (product.stok <= 0) {
+                        alert('Tidak dapat mengaktifkan menu karena stok masih 0!');
+                        product.is_available = false;
+                        return;
+                    }
+                    product.is_available = !product.is_available;
+                    this.saveMenuToSheet();
+                },
+
+                deleteProduct(id) {
+                    if (confirm('Hapus menu ini?')) {
+                        this.products = this.products.filter(p => p.id !== id);
+                        this.saveMenuToSheet();
+                    }
+                },
+
+                async saveMenuToSheet() {
+                    try {
+                        fetch(this.apiUrl, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'saveMenu',
+                                menu: this.products
+                            })
+                        });
+                    } catch (e) {
+                        console.error('Gagal menyimpan menu ke Sheet:', e);
+                    }
+                },
+
+                async syncData() {
+                    this.isLoading = true;
+                    try {
+                        const resData = await fetch(`${this.apiUrl}?action=getData`);
+                        if (resData.ok) {
+                            const data = await resData.json();
+
+                            if (data.settings) {
+                                if (data.settings.pin) this.ownerPin = String(data.settings.pin);
+                                if (data.settings.wa_owner) this.ownerWhatsapp = String(data.settings.wa_owner);
+                            }
+
+                            if (data.jam_po && typeof data.jam_po === 'object') {
+                                Object.keys(this.operatingHours).forEach(day => {
+                                    if (data.jam_po[day]) {
+                                        this.operatingHours[day] = {
+                                            isOpen: data.jam_po[day].isOpen === true || data.jam_po[day].isOpen === 'true',
+                                            closeTime: data.jam_po[day].closeTime || '22:00'
+                                        };
+                                    }
+                                });
+                            }
+
+                            if (Array.isArray(data.menu)) {
+                                this.products = data.menu.map(p => {
+                                    const stockVal = Number(p.stok !== undefined ? p.stok : (p.stock !== undefined ? p.stock : 10));
+                                    const isAvail = (p.is_available === true || p.is_available === 'true' || p.is_available === 'TRUE' || p.is_available === 1 || p.is_available === undefined) && stockVal > 0;
+                                    return {
+                                        ...p,
+                                        harga: Number(p.harga || p.price || 0),
+                                        stok: stockVal,
+                                        is_available: isAvail
+                                    };
+                                });
+                            }
+
+                            if (Array.isArray(data.orders)) {
+                                this.orders = data.orders.map(o => ({
+                                    ...o,
+                                    items: this.getItemList(o.items),
+                                    total_harga: Number(o.total_harga || o.total || 0)
+                                }));
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Gagal sync data:', e);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            },
+
+            async mounted() {
+                await this.syncData();
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
