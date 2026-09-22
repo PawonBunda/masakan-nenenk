@@ -227,7 +227,7 @@
 
                     <div class="flex items-center gap-2 flex-wrap">
                         <button 
-                            @click="syncData" 
+                            @click="manualSyncData" 
                             :disabled="isLoading"
                             class="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all">
                             <i class="fa-solid fa-rotate" :class="{'animate-spin': isLoading}"></i>
@@ -929,6 +929,7 @@
                     isSavingPIN: false,
 
                     toasts: [],
+                    pollingInterval: null, // Timer auto-update latar belakang
 
                     checkoutForm: {
                         name: '',
@@ -1054,13 +1055,10 @@
                     });
                 },
 
-                // REKAP PORSI DAPUR (Hanya menampilkan pesanan yang BELUM SELESAI & BELUM BATAL)
                 kitchenSummary() {
                     const summaryMap = {};
                     this.filteredOrders.forEach(order => {
                         const status = (order.status || '').trim().toLowerCase();
-                        
-                        // Abaikan pesanan yang sudah Selesai atau Dibatalkan
                         const isCompleted = status === 'selesai' || status === 'completed';
                         const isCancelled = status === 'dibatalkan' || status === 'cancelled';
 
@@ -1349,15 +1347,19 @@
                         return;
                     }
 
+                    // Sinkronisasi kilat sebelum checkout untuk memastikan stok aman dari rebutan pembeli lain
+                    this.isLoading = true;
+                    await this.syncData();
+
                     for (const cartItem of this.cart) {
                         const prod = this.products.find(p => p.id === cartItem.id);
                         if (!prod || prod.stok < cartItem.jumlah || !prod.is_available) {
-                            this.showToast(`Maaf, stok untuk menu "${cartItem.nama}" tidak mencukupi!`, 'error');
+                            this.isLoading = false;
+                            this.showToast(`Maaf, stok untuk menu "${cartItem.nama}" baru saja habis/berubah dipesan orang lain!`, 'error');
                             return;
                         }
                     }
 
-                    this.isLoading = true;
                     const orderId = 'PO-' + Math.floor(100000 + Math.random() * 900000);
                     const cartItemsCopy = JSON.parse(JSON.stringify(this.cart));
 
@@ -1428,6 +1430,28 @@
                 async updateOrderStatus(orderId, newStatus) {
                     const order = this.orders.find(o => o.id === orderId);
                     if (order) {
+                        const oldStatus = order.status;
+                        
+                        // Cek apakah pesanan sebelumnya belum dibatalkan, lalu sekarang diubah menjadi "Dibatalkan"
+                        const isNowCancelled = (newStatus === 'Dibatalkan' || newStatus === 'cancelled');
+                        const wasAlreadyCancelled = (oldStatus === 'Dibatalkan' || oldStatus === 'cancelled');
+
+                        if (isNowCancelled && !wasAlreadyCancelled) {
+                            // Kembalikan stok produk berdasarkan item di pesanan ini
+                            const items = this.getItemList(order.items);
+                            items.forEach(cartItem => {
+                                const product = this.products.find(p => p.id === cartItem.id || p.nama === cartItem.nama || p.name === cartItem.nama);
+                                if (product) {
+                                    product.stok = Number(product.stok || 0) + Number(cartItem.jumlah || cartItem.qty || 0);
+                                    if (product.stok > 0) {
+                                        product.is_available = true;
+                                    }
+                                }
+                            });
+                            // Simpan pembaruan stok menu yang sudah dikembalikan ke Google Sheets
+                            await this.saveMenuToSheet();
+                        }
+
                         order.status = newStatus;
                         this.showToast(`Status pesanan diperbarui menjadi: ${newStatus}`, 'success');
 
@@ -1637,8 +1661,8 @@
                     }
                 },
 
+                // Fungsi sinkronisasi sunyi di latar belakang (tanpa memunculkan loading spinner besar)
                 async syncData() {
-                    this.isLoading = true;
                     try {
                         const resData = await fetch(`${this.apiUrl}?action=getData`);
                         if (resData.ok) {
@@ -1681,18 +1705,41 @@
                                 }));
                             }
                         }
-                        this.showToast('Data berhasil disinkronkan dengan Google Sheets.', 'success');
                     } catch (e) {
-                        console.error('Gagal sync data:', e);
-                        this.showToast('Gagal melakukan sinkronisasi data.', 'error');
-                    } finally {
-                        this.isLoading = false;
+                        console.error('Gagal sync data background:', e);
                     }
+                },
+
+                // Fungsi sinkronisasi manual untuk tombol Admin
+                async manualSyncData() {
+                    this.isLoading = true;
+                    await this.syncData();
+                    this.isLoading = false;
+                    this.showToast('Data berhasil disinkronkan dengan Google Sheets.', 'success');
                 }
             },
 
             async mounted() {
+                // Ambil data pertama kali saat halaman dibuka
+                this.isLoading = true;
                 await this.syncData();
+                this.isLoading = false;
+
+                // FITUR AUTO-UPDATE OTOMATIS: 
+                // Cek data terbaru dari Google Sheets setiap 10 detik di background
+                this.pollingInterval = setInterval(() => {
+                    // Jeda sejenak jika keranjang belanja atau modal pin sedang dibuka agar user tidak terganggu
+                    if (!this.isCartOpen && !this.isPinModalOpen) {
+                        this.syncData();
+                    }
+                }, 10000); 
+            },
+
+            beforeUnmount() {
+                // Hentikan interval timer saat aplikasi ditutup/pindah
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                }
             }
         }).mount('#app');
     </script>
