@@ -8,18 +8,18 @@
   "short_name": "pawonbunda.github",
   "start_url": "/masakan-nenenk/",
   "theme_color": "#fff000",
-  "id": "Masakan Nenek",
-  "description": "Maskan Rumah Khas Minang"
+  "id": "/masakan-nenenk/",
+  "description": "Masakan Rumah Khas Minang",
   "icons": [
-        {
-            "src": "logo.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "logo.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ]
+    {
+      "src": "logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
